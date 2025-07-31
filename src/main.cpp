@@ -5,7 +5,9 @@ Rotev rotev;
 void setup() { rotev.begin(); }
 
 void loop() {
-  Serial.println("Hello, Rotev!");
+  rotev.update();
+
+  Serial.println("gyro:" + String(rotev.getYaw()));
   rotev.ledWrite(0.0f, 0.1f, 0.0f);
-  delay(1000);
+  delay(25);
 }
