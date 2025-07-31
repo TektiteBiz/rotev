@@ -160,7 +160,7 @@ void Rotev::motorEnable(bool enable) {
 
 void Rotev::motorWrite1(float speed) {
   digitalWrite(DRV1_PH, speed >= 0.0f ? HIGH : LOW);
-  analogWrite(DRV1_EN, (uint16_t)(fabsf(speed) * 65535.0f));
+  // analogWrite(DRV1_EN, (uint16_t)(fabsf(speed) * 65535.0f));
 }
 
 void Rotev::motorWrite2(float speed) {
