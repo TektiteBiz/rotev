@@ -115,7 +115,8 @@ void Rotev::begin() {
   pinMode(DRV2_PH, OUTPUT);
   pinMode(DRV2_DISABLE, OUTPUT);
 
-  analogWriteFreq(10000);  // 10000 Hz = 10 kHz
+  analogWriteFreq(10000);     // 10000 Hz = 10 kHz
+  analogWriteResolution(16);  // 16-bit resolution
 
   this->motorEnable(false);  // Disable motors initially
   this->motorWrite1(0.0f);
@@ -142,9 +143,9 @@ void Rotev::update() { this->mpu.readSensor(); }
 float Rotev::getYaw() { return this->mpu.getGyroZ(); }
 
 void Rotev::ledWrite(float r, float g, float b) {
-  analogWrite(LEDR, (int)(r * 255.0f));
-  analogWrite(LEDG, (int)(g * 255.0f));
-  analogWrite(LEDB, (int)(b * 255.0f));
+  analogWrite(LEDR, (uint16_t)(r * 65535.0f));
+  analogWrite(LEDG, (uint16_t)(g * 65535.0f));
+  analogWrite(LEDB, (uint16_t)(b * 65535.0f));
 }
 
 void Rotev::motorEnable(bool enable) {
@@ -159,12 +160,12 @@ void Rotev::motorEnable(bool enable) {
 
 void Rotev::motorWrite1(float speed) {
   digitalWrite(DRV1_PH, speed >= 0.0f ? HIGH : LOW);
-  analogWrite(DRV1_EN, (uint8_t)(abs(speed) * 255.0f));
+  analogWrite(DRV1_EN, (uint16_t)(fabsf(speed) * 65535.0f));
 }
 
 void Rotev::motorWrite2(float speed) {
   digitalWrite(DRV2_PH, speed >= 0.0f ? HIGH : LOW);
-  analogWrite(DRV2_EN, (uint8_t)(abs(speed) * 255.0f));
+  analogWrite(DRV2_EN, (uint16_t)(fabsf(speed) * 65535.0f));
 }
 
 float Rotev::getVoltage() {
