@@ -6,6 +6,7 @@ void setup() {
   rotev.begin();
   rotev.motorEnable(true);
   rotev.motorWrite1(0.1f);
+  rotev.motorWrite2(0.1f);
 }
 
 void loop() {

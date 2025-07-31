@@ -13,7 +13,7 @@
 
 #define DRV1_CS 7
 #define DRV1_EN 6
-#define DRV1_PH 8
+#define DRV1_PH 5
 #define DRV1_DISABLE 4
 #define DRV1_CURR 26
 
@@ -37,18 +37,7 @@ Rotev::Rotev()
   // Constructor initializes MPU6500 with default settings
 }
 
-int initMotor(DRV8873_SPI& drv) {
-  drv.clearAllFaults();
-  delay(1);
-  uint8_t fault_status = drv.getFaultStatus();
-  if (fault_status != 0) {
-    uint8_t status2 = drv.readRegister(DRV8873_REG_DIAG);
-    Serial.println("Motor initialization failed with fault status: " +
-                   String(fault_status, HEX) +
-                   ", DIAG status: " + String(status2, HEX));
-    return -1;
-  }
-
+int initMotor(DRV8873_SPI& drv, bool one) {
   // Configure for PH/EN mode
   uint8_t ic1_ctrl = drv.readRegister(DRV8873_REG_IC1_CTRL);
   // Set the MODE bits to PH/EN (00b)
@@ -57,6 +46,24 @@ int initMotor(DRV8873_SPI& drv) {
   // Set SPI_IN to 0 to use INx pins
   ic1_ctrl &= ~DRV8873_IC1_SPI_IN;
   drv.writeRegister(DRV8873_REG_IC1_CTRL, ic1_ctrl);
+
+  // Disable open-load protection
+  /*uint8_t ic4_ctrl = drv.readRegister(DRV8873_REG_IC4_CTRL);
+  ic4_ctrl &= ~(DRV8873_IC4_EN_OLP | DRV8873_IC4_EN_OLA);
+  drv.writeRegister(DRV8873_REG_IC4_CTRL, ic4_ctrl);*/
+
+  // Check faults
+  drv.clearAllFaults();
+  delay(1);
+  uint8_t fault_status = drv.getFaultStatus();
+  if (fault_status != 0) {
+    uint8_t status2 = drv.readRegister(DRV8873_REG_DIAG);
+    Serial.println("Motor " + String(one ? "1" : "2") +
+                   " initialization failed with fault status: 0x" +
+                   String(fault_status, HEX) + ", DIAG status: 0x" +
+                   String(status2, HEX));
+    return -1;
+  }
 
   return 0;
 }
@@ -75,7 +82,6 @@ void Rotev::begin() {
   SPI.setSCK(IMU_SCK);
   SPI.setMISO(IMU_MISO);
   SPI.setMOSI(IMU_MOSI);
-  SPI.setCS(IMU_CS);
   SPI.begin();
   if (!mpu.begin()) {
     while (1) {
@@ -84,6 +90,20 @@ void Rotev::begin() {
       delay(1000);
     }
   }
+
+  // Analog
+  analogReadResolution(12);
+  pinMode(DRV1_CURR, INPUT);
+  pinMode(DRV2_CURR, INPUT);
+  pinMode(VBUS, INPUT);
+  pinMode(STOP, INPUT_PULLUP);
+  pinMode(GO, INPUT_PULLUP);
+
+  // Servo
+  pinMode(SERVO, OUTPUT);
+  Servo servo;
+  servo.attach(SERVO);
+  servo.write(90);  // Center the servo
 
   // Motor drivers
   pinMode(DRV1_CS, OUTPUT);
@@ -96,6 +116,8 @@ void Rotev::begin() {
   pinMode(DRV2_PH, OUTPUT);
   pinMode(DRV2_DISABLE, OUTPUT);
 
+  analogWriteFreq(10000);  // 10000 Hz = 10 kHz
+
   this->motorEnable(false);  // Disable motors initially
   this->motorWrite1(0.0f);
   this->motorWrite2(0.0f);
@@ -103,31 +125,18 @@ void Rotev::begin() {
   driver1.begin();
   driver2.begin();
 
-  int status = initMotor(driver1);
+  int status = initMotor(driver1, true);
   while (status != 0) {
     ledWrite(0.25f, 0.0f, 0.0f);  // Red LED on error
     delay(1000);
-    status = initMotor(driver1);
+    status = initMotor(driver1, true);
   }
-  status = initMotor(driver2);
+  status = initMotor(driver2, false);
   while (status != 0) {
     ledWrite(0.25f, 0.0f, 0.0f);  // Red LED on error
     delay(1000);
-    status = initMotor(driver2);
+    status = initMotor(driver2, false);
   }
-
-  // Analog
-  pinMode(DRV1_CURR, INPUT);
-  pinMode(DRV2_CURR, INPUT);
-  pinMode(VBUS, INPUT);
-  pinMode(STOP, INPUT_PULLUP);
-  pinMode(GO, INPUT_PULLUP);
-
-  // Servo
-  pinMode(SERVO, OUTPUT);
-  Servo servo;
-  servo.attach(SERVO);
-  servo.write(90);  // Center the servo
 }
 void Rotev::update() { this->mpu.readSensor(); }
 
@@ -141,34 +150,30 @@ void Rotev::ledWrite(float r, float g, float b) {
 
 void Rotev::motorEnable(bool enable) {
   if (enable) {
-    digitalWrite(DRV1_EN, LOW);
-    digitalWrite(DRV2_EN, LOW);
+    digitalWrite(DRV1_DISABLE, LOW);
+    digitalWrite(DRV2_DISABLE, LOW);
   } else {
-    digitalWrite(DRV1_EN, HIGH);
-    digitalWrite(DRV2_EN, HIGH);
+    digitalWrite(DRV1_DISABLE, HIGH);
+    digitalWrite(DRV2_DISABLE, HIGH);
   }
 }
 
 void Rotev::motorWrite1(float speed) {
-  digitalWrite(DRV1_PH, speed >= 0 ? HIGH : LOW);
-  analogWrite(DRV1_CS, (uint8_t)(abs(speed) * 255.0f));
+  digitalWrite(DRV1_PH, speed >= 0.0f ? HIGH : LOW);
+  analogWrite(DRV1_EN, (uint8_t)(abs(speed) * 255.0f));
 }
 
 void Rotev::motorWrite2(float speed) {
-  digitalWrite(DRV2_PH, speed >= 0 ? HIGH : LOW);
-  analogWrite(DRV2_CS, (uint8_t)(abs(speed) * 255.0f));
+  digitalWrite(DRV2_PH, speed >= 0.0f ? HIGH : LOW);
+  analogWrite(DRV2_EN, (uint8_t)(abs(speed) * 255.0f));
 }
 
 float Rotev::getVoltage() {
   // 18kohm R1 5.1kohm R2
   int raw = analogRead(VBUS);
-  float voltage = (raw * 3.3f / 4096.0f) * (18.0f + 5.1f) / 5.1f *
-                  2.0f;  // 2.0 for voltage divider
+  float voltage = ((float)raw * 3.3f / 4096.0f) * (18.0f + 5.1f) / 5.1f;
   return voltage;
 }
 
-bool Rotev::stopButtonPressed() {
-  Serial.println(digitalRead(STOP));
-  return digitalRead(STOP) == LOW;
-}
+bool Rotev::stopButtonPressed() { return digitalRead(STOP) == LOW; }
 bool Rotev::goButtonPressed() { return digitalRead(GO) == LOW; }

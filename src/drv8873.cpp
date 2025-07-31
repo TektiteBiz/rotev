@@ -8,8 +8,8 @@
 DRV8873_SPI::DRV8873_SPI(uint8_t cs_pin) {
   _cs_pin = cs_pin;
   // DRV8873 supports SPI clock up to 10 MHz.
-  // Mode 0 (CPOL=0, CPHA=0) is typical for TI drivers.
-  _spi_settings = SPISettings(4000000, MSBFIRST, SPI_MODE0);
+  // Mode 1 (CPOL=0, CPHA=1) is typical for TI drivers.
+  _spi_settings = SPISettings(4000000, MSBFIRST, SPI_MODE1);
 }
 
 /**

@@ -32,6 +32,24 @@
 #define DRV8873_FAULT_TSD (1 << 1)     // Overtemperature shutdown
 #define DRV8873_FAULT_OLD (1 << 0)     // Open-load detection
 
+// --- Bitmasks for IC4_CTRL Register (0x05) ---
+#define DRV8873_IC4_EN_OLP (1 << 6)   // Enable Open-Load Passive Diagnostic
+#define DRV8873_IC4_OLP_DLY (1 << 5)  // Open-Load Passive Diagnostic Delay
+#define DRV8873_IC4_EN_OLA (1 << 4)   // Enable Open-Load Active Diagnostic
+#define DRV8873_IC4_ITRIP_LVL_MASK 0b1100     // Mask for ITRIP_LVL bits
+#define DRV8873_IC4_ITRIP_LVL_00 (0b00 << 2)  // ITRIP_LVL: 00b
+#define DRV8873_IC4_ITRIP_LVL_01 (0b01 << 2)  // ITRIP_LVL: 01b
+#define DRV8873_IC4_ITRIP_LVL_10 (0b10 << 2)  // ITRIP_LVL: 10b
+#define DRV8873_IC4_ITRIP_LVL_11 (0b11 << 2)  // ITRIP_LVL: 11b
+#define DRV8873_IC4_DIS_ITRIP_MASK 0b11       // Mask for DIS_ITRIP bits
+#define DRV8873_IC4_DIS_ITRIP_NONE 0b00  // Disable current regulation: None
+#define DRV8873_IC4_DIS_ITRIP_OUT1 \
+  0b01  // Disable current regulation: Only OUT1
+#define DRV8873_IC4_DIS_ITRIP_OUT2 \
+  0b10  // Disable current regulation: Only OUT2
+#define DRV8873_IC4_DIS_ITRIP_BOTH \
+  0b11  // Disable current regulation: Both OUT1 and OUT2
+
 class DRV8873_SPI {
  public:
   // Constructor: Takes the SPI Chip Select (CS) pin
