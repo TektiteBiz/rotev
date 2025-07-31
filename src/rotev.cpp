@@ -15,11 +15,20 @@
 #define DRV1_EN 6
 #define DRV1_PH 8
 #define DRV1_DISABLE 4
+#define DRV1_CURR 26
 
 #define DRV2_CS 3
 #define DRV2_EN 2
 #define DRV2_PH 1
 #define DRV2_DISABLE 0
+#define DRV2_CURR 27
+
+#define STOP 8
+#define GO 9
+
+#define SERVO 24
+
+#define VBUS 28
 
 Rotev::Rotev()
     : mpu(SPI, IMU_CS, Mpu6x00::GYRO_2000DPS, Mpu6x00::ACCEL_16G),
@@ -106,6 +115,19 @@ void Rotev::begin() {
     delay(1000);
     status = initMotor(driver2);
   }
+
+  // Analog
+  pinMode(DRV1_CURR, INPUT);
+  pinMode(DRV2_CURR, INPUT);
+  pinMode(VBUS, INPUT);
+  pinMode(STOP, INPUT_PULLUP);
+  pinMode(GO, INPUT_PULLUP);
+
+  // Servo
+  pinMode(SERVO, OUTPUT);
+  Servo servo;
+  servo.attach(SERVO);
+  servo.write(90);  // Center the servo
 }
 void Rotev::update() { this->mpu.readSensor(); }
 
@@ -136,3 +158,17 @@ void Rotev::motorWrite2(float speed) {
   digitalWrite(DRV2_PH, speed >= 0 ? HIGH : LOW);
   analogWrite(DRV2_CS, (uint8_t)(abs(speed) * 255.0f));
 }
+
+float Rotev::getVoltage() {
+  // 18kohm R1 5.1kohm R2
+  int raw = analogRead(VBUS);
+  float voltage = (raw * 3.3f / 4096.0f) * (18.0f + 5.1f) / 5.1f *
+                  2.0f;  // 2.0 for voltage divider
+  return voltage;
+}
+
+bool Rotev::stopButtonPressed() {
+  Serial.println(digitalRead(STOP));
+  return digitalRead(STOP) == LOW;
+}
+bool Rotev::goButtonPressed() { return digitalRead(GO) == LOW; }

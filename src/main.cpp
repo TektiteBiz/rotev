@@ -11,7 +11,15 @@ void setup() {
 void loop() {
   rotev.update();
 
-  Serial.println("gyro:" + String(rotev.getYaw()));
-  rotev.ledWrite(0.0f, 0.1f, 0.0f);
+  Serial.print("gyro:" + String(rotev.getYaw()));
+  Serial.print(",voltage:" + String(rotev.getVoltage()));
+  Serial.println();
+  if (rotev.stopButtonPressed()) {
+    rotev.ledWrite(0.1f, 0.0f, 0.0f);
+  } else if (rotev.goButtonPressed()) {
+    rotev.ledWrite(0.0f, 0.1f, 0.0f);
+  } else {
+    rotev.ledWrite(0.0f, 0.0f, 0.1f);
+  }
   delay(25);
 }
