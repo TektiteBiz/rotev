@@ -18,6 +18,8 @@ class Rotev {
   void motorEnable(bool enable);
   void motorWrite1(float speed);
   void motorWrite2(float speed);
+  float motorCurr1();
+  float motorCurr2();
   float getVoltage();
   bool stopButtonPressed();
   bool goButtonPressed();

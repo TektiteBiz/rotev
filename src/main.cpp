@@ -14,6 +14,8 @@ void loop() {
 
   Serial.print("gyro:" + String(rotev.getYaw()));
   Serial.print(",voltage:" + String(rotev.getVoltage()));
+  Serial.print(",curr1:" + String(rotev.motorCurr1()));
+  Serial.print(",curr2:" + String(rotev.motorCurr2()));
   Serial.println();
   if (rotev.stopButtonPressed()) {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);

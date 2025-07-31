@@ -175,5 +175,17 @@ float Rotev::getVoltage() {
   return voltage;
 }
 
+float Rotev::motorCurr1() {
+  int raw = analogRead(DRV1_CURR);
+  float voltage = (float)raw * 3.3f / 4096.0f;
+  return voltage / 680.0f * 1100.0f;  // 680-ohm resistor, 1100 gain
+}
+
+float Rotev::motorCurr2() {
+  int raw = analogRead(DRV2_CURR);
+  float voltage = (float)raw * 3.3f / 4096.0f;
+  return voltage / 680.0f * 1100.0f;  // 680-ohm resistor, 1100 gain
+}
+
 bool Rotev::stopButtonPressed() { return digitalRead(STOP) == LOW; }
 bool Rotev::goButtonPressed() { return digitalRead(GO) == LOW; }
