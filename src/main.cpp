@@ -2,7 +2,11 @@
 
 Rotev rotev;
 
-void setup() { rotev.begin(); }
+void setup() {
+  rotev.begin();
+  rotev.motorEnable(true);
+  rotev.motorWrite1(0.1f);
+}
 
 void loop() {
   rotev.update();
