@@ -26,6 +26,7 @@ class Rotev {
   Mpu6500 mpu;
   DRV8873_SPI driver1;
   DRV8873_SPI driver2;
+  Servo servo;
 };
 
 #endif

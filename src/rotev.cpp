@@ -101,9 +101,8 @@ void Rotev::begin() {
 
   // Servo
   pinMode(SERVO, OUTPUT);
-  Servo servo;
-  servo.attach(SERVO);
-  servo.write(90);  // Center the servo
+  this->servo.attach(SERVO);
+  this->servo.write(90);  // Center the servo
 
   // Motor drivers
   pinMode(DRV1_CS, OUTPUT);
