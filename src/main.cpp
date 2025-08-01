@@ -15,10 +15,10 @@ void setup() {
 void loop() {
   uint32_t curr = rp2040.fifo.pop();
 
-  rotev.update();
-
-  Serial.print("gyro:" + String(rotev.getYaw()));
+  Serial.print("gyro:" + String(rotev.readYaw()));
   Serial.print(",curr:" + String(curr / 1000.0f));  // Convert to Amps
+  Serial.print(",enc1:" + String(rotev.enc1Angle()));
+  Serial.print(",enc2:" + String(rotev.enc2Angle()));
   Serial.println();
   if (rotev.stopButtonPressed()) {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
@@ -104,7 +104,7 @@ void loop1() {
   float vbus = rotev.getVoltage();
   float dt =
       (float)(micros() - prevTimeMicros) / 1000000.0f;  // Convert to seconds
-  piUpdate(dt, false, 0.2f, vbus);
+  piUpdate(dt, false, 0.1f, vbus);
   prevTimeMicros = micros();
   delayMicroseconds(500);  // Run at 20khz max
 

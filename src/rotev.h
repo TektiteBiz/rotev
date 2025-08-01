@@ -6,15 +6,15 @@
 #include "Arduino.h"
 #include "drv8873.h"
 #include "mpu6x00.h"
+#include "mt6701.h"
 
 class Rotev {
  public:
   Rotev();
 
   void begin();
-  void update();
   void ledWrite(float r, float g, float b);
-  float getYaw();
+  float readYaw();
   void motorEnable(bool enable);
   void motorWrite1(float speed);
   void motorWrite2(float speed);
@@ -23,12 +23,16 @@ class Rotev {
   float getVoltage();
   bool stopButtonPressed();
   bool goButtonPressed();
+  float enc1Angle();
+  float enc2Angle();
 
  private:
   Mpu6500 mpu;
   DRV8873_SPI driver1;
   DRV8873_SPI driver2;
   Servo servo;
+  MT6701 enc1;
+  MT6701 enc2;
 };
 
 #endif

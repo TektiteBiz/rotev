@@ -23,6 +23,12 @@
 #define DRV2_DISABLE 0
 #define DRV2_CURR 27
 
+#define ENC_SCK 10
+#define ENC_MOSI 11
+#define ENC_MISO 12
+#define ENC1_CS 13
+#define ENC2_CS 14
+
 #define STOP 8
 #define GO 9
 
@@ -33,7 +39,9 @@
 Rotev::Rotev()
     : mpu(SPI, IMU_CS, Mpu6x00::GYRO_2000DPS, Mpu6x00::ACCEL_16G),
       driver1(DRV1_CS),
-      driver2(DRV2_CS) {
+      driver2(DRV2_CS),
+      enc1(&SPI1, ENC1_CS),
+      enc2(&SPI1, ENC2_CS) {
   // Constructor initializes MPU6500 with default settings
 }
 
@@ -137,10 +145,20 @@ void Rotev::begin() {
     delay(1000);
     status = initMotor(driver2, false);
   }
-}
-void Rotev::update() { this->mpu.readSensor(); }
 
-float Rotev::getYaw() { return this->mpu.getGyroZ(); }
+  // Encoders
+  SPI1.setSCK(ENC_SCK);
+  SPI1.setMISO(ENC_MISO);
+  SPI1.setMOSI(ENC_MOSI);
+  SPI1.begin();
+  enc1.begin();
+  enc2.begin();
+}
+
+float Rotev::readYaw() {
+  this->mpu.readSensor();
+  return this->mpu.getGyroZ();
+}
 
 void Rotev::ledWrite(float r, float g, float b) {
   analogWrite(LEDR, (uint16_t)(r * 65535.0f));
@@ -189,3 +207,7 @@ float Rotev::motorCurr2() {
 
 bool Rotev::stopButtonPressed() { return digitalRead(STOP) == LOW; }
 bool Rotev::goButtonPressed() { return digitalRead(GO) == LOW; }
+
+float Rotev::enc1Angle() { return enc1.readAngleDegrees(); }
+
+float Rotev::enc2Angle() { return enc2.readAngleDegrees(); }
