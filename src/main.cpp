@@ -12,6 +12,16 @@ void setup() {
   rp2040.fifo.push(0);  // Send ready signal
 }
 
+void pushIref(float iref, bool motor1) {
+  uint32_t val = (uint32_t)(iref * 10000.0f) << 1;
+  if (motor1) {
+    val |= 0x1;  // Set bit 0 for motor 1
+  } else {
+    val &= ~0x1;  // Clear bit 0 for motor 2
+  }
+  rp2040.fifo.push(val);
+}
+
 void loop() {
   uint32_t curr = rp2040.fifo.pop();
 
@@ -22,8 +32,10 @@ void loop() {
   Serial.println();
   if (rotev.stopButtonPressed()) {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
+    pushIref(0.0f, false);
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
+    pushIref(0.2f, false);
   } else {
     rotev.ledWrite(0.0f, 0.0f, 0.1f);
   }
@@ -100,17 +112,32 @@ void setup1() {
   lastWrite = millis();
 }
 
+float iref1 = 0.0f;
+float iref2 = 0.0f;
 void loop1() {
   float vbus = rotev.getVoltage();
   float dt =
       (float)(micros() - prevTimeMicros) / 1000000.0f;  // Convert to seconds
-  piUpdate(dt, false, 0.1f, vbus);
+  piUpdate(dt, true, iref1, vbus);
+  piUpdate(dt, false, iref2, vbus);
   prevTimeMicros = micros();
-  delayMicroseconds(500);  // Run at 20khz max
+  delayMicroseconds(100);  // Run at 10khz max
 
   // Send over current data every 50ms
   if (millis() - lastWrite > 50) {
     lastWrite = millis();
     rp2040.fifo.push_nb((uint32_t)(rotev.motorCurr2() * 1000.0f));
+  }
+
+  // Check for iref
+  if (rp2040.fifo.available() > 0) {
+    uint32_t val = rp2040.fifo.pop();
+    float iref = (float)(val >> 1) / 10000.0f;
+    bool motor1 = (val & 0x1) != 0;
+    if (motor1) {
+      iref1 = iref;
+    } else {
+      iref2 = iref;
+    }
   }
 }
