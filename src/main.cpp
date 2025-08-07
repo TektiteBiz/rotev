@@ -35,15 +35,25 @@ void loop() {
     pushIref(0.0f, false);
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
-    pushIref(0.2f, false);
+    pushIref(1.4f, false);
   } else {
     rotev.ledWrite(0.0f, 0.0f, 0.1f);
   }
 }
 
+/*
+25GA-370 (https://www.amazon.com/dp/B07ZKLZYRY)
+- Resistance: 3.81 ohms
+- Inductance: 158.5uH
+
+Pololu 25D motor:
+- Resistance: 2.26 ohms
+- Inductance: 87.3uH
+*/
+
 #define BANDWIDTH 120 * 2 * M_PI  // Bandwidth in Hz * 2pi
-#define INDUCTANCE 158.5e-6       // Henries
-#define RESISTANCE 3.81           // Ohms
+#define INDUCTANCE 87.3e-6        // Henries
+#define RESISTANCE 2.26           // Ohms
 #define MAX_DUTY 0.95f            // Duty cycle out of 1
 unsigned long prevTimeMicros = 0;
 unsigned long lastWrite = 0;
@@ -130,7 +140,7 @@ void loop1() {
   }
 
   // Check for iref
-  if (rp2040.fifo.available() > 0) {
+  while (rp2040.fifo.available() > 0) {
     uint32_t val = rp2040.fifo.pop();
     float iref = (float)(val >> 1) / 10000.0f;
     bool motor1 = (val & 0x1) != 0;
