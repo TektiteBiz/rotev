@@ -2,9 +2,9 @@
 
 #include "Arduino.h"
 
-#define LEDR 23
-#define LEDG 22
-#define LEDB 21
+#define LEDR 25
+#define LEDG 24
+#define LEDB 23
 
 #define IMU_MISO 16
 #define IMU_CS 17
@@ -32,7 +32,7 @@
 #define STOP 8
 #define GO 9
 
-#define SERVO 24
+#define SERVO 20
 
 #define VBUS 28
 
