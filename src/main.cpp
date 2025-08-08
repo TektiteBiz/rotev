@@ -5,8 +5,6 @@
 Rotev rotev;
 float prevAngle1 = 0.0f;
 float prevAngle2 = 0.0f;
-float pos1 = 0.0f;
-float pos2 = 0.0f;
 float heading = 0.0f;
 
 float targVel1 = 0.0f;
@@ -66,6 +64,19 @@ float volt = 0.0f;
 float vel_kP = 0.02f;
 float vel1 = 0.0f;
 float vel2 = 0.0f;
+
+float posX = 0.0f;
+float posY = 0.0f;
+
+float kPx = 10.0f;
+float kPh = 250.0f;
+float kPh_d = 20.0f;         // Derivative gain for heading control
+float kPy = 10.0f;           // Y error gain
+const float targX = 200.0f;  // Target X position in cm
+
+bool going = false;
+
+bool goPressed = false;
 void loop() {
   if (rp2040.fifo.available()) {
     volt = rp2040.fifo.pop() / 1000.0f;  // Convert from mV to V
@@ -80,27 +91,53 @@ void loop() {
   float delta2 = wrapDelta(angle2 - prevAngle2) * CM_PER_RAD * MOTOR2_MULT;
   float vel1_raw = delta1 / dT;
   float vel2_raw = delta2 / dT;
-  vel1 = (vel1 * 0.5f) + (vel1_raw * 0.5f);         // Low-pass filter
-  vel2 = (vel2 * 0.5f) + (vel2_raw * 0.5f);         // Low-pass filter
-  heading += (rotev.readYaw() - GYRO_OFFSET) * dT;  // Heading in radians
+  vel1 = (vel1 * 0.5f) + (vel1_raw * 0.5f);  // Low-pass filter
+  vel2 = (vel2 * 0.5f) + (vel2_raw * 0.5f);  // Low-pass filter
+  float yawRate = rotev.readYaw() - GYRO_OFFSET;
+  heading += yawRate * dT;  // Heading in radians
+
+  // Calculate position from deltas and heading
+  float delPos = (delta1 + delta2) / 2.0f;
+  posX += delPos * cosf(heading);
+  posY += delPos * sinf(heading);
+
+  // Update position controllers
+  float v = kPx * (targX - posX);
+  // Max of 2m/s
+  if (v > 200.0f) {
+    v = 200.0f;
+  } else if (v < -200.0f) {
+    v = -200.0f;
+  }
+  float w = kPh * heading + kPh_d * yawRate + kPy * posY;  // Heading control
+  if (going) {
+    targVel1 = v + w;
+    targVel2 = v - w;
+  } else {
+    targVel1 = 0.0f;
+    targVel2 = 0.0f;
+  }
 
   prevAngle1 = angle1;
   prevAngle2 = angle2;
-  pos1 += delta1;
-  pos2 += delta2;
 
   if (rotev.stopButtonPressed()) {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
     pushIref(0.0f, true);
     pushIref(0.0f, false);
-    targVel1 = 0.0f;
-    targVel2 = 0.0f;
+    going = false;
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
-    targVel1 = 200.0f;
-    targVel2 = 200.0f;  // 1mph
+    goPressed = true;
   } else {
     rotev.ledWrite(0.0f, 0.0f, 0.1f);
+  }
+  if (!rotev.goButtonPressed() && goPressed) {
+    goPressed = false;
+    going = true;
+    posX = 0.0f;
+    posY = 0.0f;
+    heading = 0.0f;
   }
 
   float err1 = (targVel1 - vel1) * vel_kP;
@@ -124,8 +161,8 @@ void loop() {
     Serial.print(",volt:" + String(volt));
     Serial.print(",vel1:" + String(vel1));
     Serial.print(",vel2:" + String(vel2));
-    Serial.print(",pos1:" + String(pos1));
-    Serial.print(",pos2:" + String(pos2));
+    Serial.print(",posX:" + String(posX));
+    Serial.print(",posY:" + String(posY));
     Serial.println();
   }
 }
