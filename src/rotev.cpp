@@ -109,8 +109,7 @@ void Rotev::begin() {
 
   // Servo
   pinMode(SERVO, OUTPUT);
-  this->servo.attach(SERVO);
-  this->servo.write(90);  // Center the servo
+  digitalWrite(SERVO, LOW);
 
   // Motor drivers
   pinMode(DRV1_CS, OUTPUT);
@@ -155,9 +154,13 @@ void Rotev::begin() {
   enc2.begin();
 }
 
-float Rotev::readYaw() {
+float Rotev::readYawDegrees() {
   this->mpu.readSensor();
   return this->mpu.getGyroZ();
+}
+float Rotev::readYaw() {
+  this->mpu.readSensor();
+  return this->mpu.getGyroZ() * DEG_TO_RAD;
 }
 
 void Rotev::ledWrite(float r, float g, float b) {
@@ -178,7 +181,7 @@ void Rotev::motorEnable(bool enable) {
 
 void Rotev::motorWrite1(float speed) {
   digitalWrite(DRV1_PH, speed >= 0.0f ? HIGH : LOW);
-  // analogWrite(DRV1_EN, (uint16_t)(fabsf(speed) * 65535.0f));
+  analogWrite(DRV1_EN, (uint16_t)(fabsf(speed) * 65535.0f));
 }
 
 void Rotev::motorWrite2(float speed) {
@@ -208,6 +211,16 @@ float Rotev::motorCurr2() {
 bool Rotev::stopButtonPressed() { return digitalRead(STOP) == LOW; }
 bool Rotev::goButtonPressed() { return digitalRead(GO) == LOW; }
 
-float Rotev::enc1Angle() { return enc1.readAngleDegrees(); }
+float Rotev::enc1Angle() { return enc1.readAngleRadians(); }
+float Rotev::enc2Angle() { return enc2.readAngleRadians(); }
+float Rotev::enc1AngleDegrees() { return enc1.readAngleDegrees(); }
+float Rotev::enc2AngleDegrees() { return enc2.readAngleDegrees(); }
 
-float Rotev::enc2Angle() { return enc2.readAngleDegrees(); }
+void Rotev::servoDetach() { this->servo.detach(); }
+// Write angle in degrees
+void Rotev::servoWrite(int angleDeg) {
+  if (!this->servo.attached()) {
+    this->servo.attach(SERVO);
+  }
+  this->servo.write(angleDeg);
+}

@@ -15,6 +15,7 @@ class Rotev {
   void begin();
   void ledWrite(float r, float g, float b);
   float readYaw();
+  float readYawDegrees();
   void motorEnable(bool enable);
   void motorWrite1(float speed);
   void motorWrite2(float speed);
@@ -25,6 +26,10 @@ class Rotev {
   bool goButtonPressed();
   float enc1Angle();
   float enc2Angle();
+  float enc1AngleDegrees();
+  float enc2AngleDegrees();
+  void servoDetach();
+  void servoWrite(int angle);
 
  private:
   Mpu6500 mpu;

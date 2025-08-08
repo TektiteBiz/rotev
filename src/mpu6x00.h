@@ -159,6 +159,7 @@ class Mpu6x00 {
   gyroFsr_e m_gyroFsr;
   accelFsr_e m_accelFsr;
 
+  float gscale[4] = {250.0, 500.0, 1000.0, 2000.0};
   float m_gyroScale;
   float m_accelScale;
 
@@ -174,7 +175,7 @@ class Mpu6x00 {
     m_accelFsr = accelFsr;
 
     // float gscale[] = {250., 500., 1000., 2000.};
-    m_gyroScale = 1.0;  // gscale[gyroFsr] / 32768.;
+    m_gyroScale = gscale[gyroFsr] / 32768.0;  // in deg/s per LSB
 
     float ascale[] = {2., 4., 8., 16.};
     m_accelScale = ascale[accelFsr] / 32768.;
