@@ -29,7 +29,7 @@ class Rotev {
   float enc1AngleDegrees();
   float enc2AngleDegrees();
   void servoDetach();
-  void servoWrite(int angle);
+  void servoWrite(float angle);
 
  private:
   Mpu6500 mpu;

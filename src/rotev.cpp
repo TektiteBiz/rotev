@@ -218,9 +218,9 @@ float Rotev::enc2AngleDegrees() { return enc2.readAngleDegrees(); }
 
 void Rotev::servoDetach() { this->servo.detach(); }
 // Write angle in degrees
-void Rotev::servoWrite(int angleDeg) {
+void Rotev::servoWrite(float angleDeg) {
   if (!this->servo.attached()) {
     this->servo.attach(SERVO);
   }
-  this->servo.write(angleDeg);
+  this->servo.writeMicroseconds(1000 + (int)(angleDeg / 180.0f * 1000.0f));
 }

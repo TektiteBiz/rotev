@@ -18,7 +18,7 @@ void setup() {
   rotev.motorEnable(true);
   rotev.motorWrite1(0.0f);
   rotev.motorWrite2(0.0f);
-  rotev.servoWrite(90);
+  rotev.servoWrite(25.0f);  // 25: closed, 180: open
   for (int i = 0; i < 10; i++) {
     prevAngle1 = rotev.enc1Angle();
     prevAngle2 = rotev.enc2Angle();
