@@ -28,17 +28,21 @@ void setup() {
   rp2040.fifo.push(0);  // Send ready signal
 }
 
-#define MOTOR1_MULT -1.0
-#define MOTOR2_MULT 1.0
+#define MOTOR1_MULT -1.0f
+#define MOTOR2_MULT 1.0f
 
 void pushIref(float iref, bool motor1) {
-  uint32_t val = (uint32_t)(iref * 10000.0f) << 1;
   if (motor1) {
-    val *= MOTOR1_MULT;  // Scale for motor 1
-    val |= 0x1;          // Set bit 0 for motor 1
+    iref *= MOTOR1_MULT;
   } else {
-    val *= MOTOR2_MULT;  // Scale for motor 2
-    val &= ~0x1;         // Clear bit 0 for motor 2
+    iref *= MOTOR2_MULT;
+  }
+  int32_t fixed = (int32_t)(iref * 10000.0f);
+  uint32_t val = ((uint32_t)fixed << 1);
+  if (motor1) {
+    val |= 0x1;  // Set bit 0 for motor 1
+  } else {
+    val &= ~0x1;  // Clear bit 0 for motor 2
   }
   rp2040.fifo.push(val);
 }
@@ -64,10 +68,8 @@ void loop() {
 
   float angle1 = rotev.enc1Angle();
   float angle2 = rotev.enc2Angle();
-  float delta1 =
-      wrapDelta(angle1 - prevAngle1) * CM_PER_RAD * (float)MOTOR1_MULT;
-  float delta2 =
-      wrapDelta(angle2 - prevAngle2) * CM_PER_RAD * (float)MOTOR2_MULT;
+  float delta1 = wrapDelta(angle1 - prevAngle1) * CM_PER_RAD * MOTOR1_MULT;
+  float delta2 = wrapDelta(angle2 - prevAngle2) * CM_PER_RAD * MOTOR2_MULT;
   float vel1 = delta1 / dT;
   float vel2 = delta2 / dT;
   heading += (rotev.readYaw() - GYRO_OFFSET) * dT;  // Heading in radians
@@ -90,8 +92,8 @@ void loop() {
     pushIref(0.0f, false);
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
-    pushIref(0.8f, true);
-    pushIref(0.8f, false);
+    pushIref(0.7f, false);
+    pushIref(0.7f, true);
   } else {
     rotev.ledWrite(0.0f, 0.0f, 0.1f);
   }
@@ -200,8 +202,9 @@ void loop1() {
   // Check for iref
   while (rp2040.fifo.available() > 0) {
     uint32_t val = rp2040.fifo.pop();
-    float iref = (float)(val >> 1) / 10000.0f;
     bool motor1 = (val & 0x1) != 0;
+    int32_t fixed = ((int32_t)val) >> 1;  // Remove motor bit
+    float iref = fixed / 10000.0f;
     if (motor1) {
       iref1 = iref;
     } else {
