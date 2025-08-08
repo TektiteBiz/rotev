@@ -29,9 +29,12 @@ void setup() {
   rp2040.fifo.push(0);  // Send ready signal
 }
 
-#define MOTOR1_MULT -1.0f
-#define MOTOR2_MULT 1.0f
-#define MAX_CURR 0.8f
+// Determined by just doing pushIref(0.8f, true) and looking at vel1/vel2
+#define MOTOR1_MULT 1.0f
+#define MOTOR2_MULT -1.0f
+#define ENC1_MULT -1.0f
+#define ENC2_MULT 1.0f
+#define MAX_CURR 0.92f
 
 void pushIref(float iref, bool motor1) {
   if (motor1) {
@@ -61,18 +64,18 @@ float wrapDelta(float delta) {
 uint32_t prevTimeMicrosCore1 = 0;
 uint32_t lastPrintCore1 = 0;
 float volt = 0.0f;
-float vel_kP = 0.02f;
+float vel_kP = 0.015f;
 float vel1 = 0.0f;
 float vel2 = 0.0f;
 
 float posX = 0.0f;
 float posY = 0.0f;
 
-float kPx = 10.0f;
-float kPh = 250.0f;
-float kPh_d = 20.0f;         // Derivative gain for heading control
-float kPy = 10.0f;           // Y error gain
-const float targX = 200.0f;  // Target X position in cm
+float kPx = 3.0f;
+float kPh = 400.0f;
+float kPh_d = 100.0f;        // Derivative gain for heading control
+float kPy = 50.0f;           // Y error gain
+const float targX = 700.0f;  // Target X position in cm
 
 bool going = false;
 
@@ -87,12 +90,12 @@ void loop() {
 
   float angle1 = rotev.enc1Angle();
   float angle2 = rotev.enc2Angle();
-  float delta1 = wrapDelta(angle1 - prevAngle1) * CM_PER_RAD * MOTOR1_MULT;
-  float delta2 = wrapDelta(angle2 - prevAngle2) * CM_PER_RAD * MOTOR2_MULT;
+  float delta1 = wrapDelta(angle1 - prevAngle1) * CM_PER_RAD * ENC1_MULT;
+  float delta2 = wrapDelta(angle2 - prevAngle2) * CM_PER_RAD * ENC2_MULT;
   float vel1_raw = delta1 / dT;
   float vel2_raw = delta2 / dT;
-  vel1 = (vel1 * 0.5f) + (vel1_raw * 0.5f);  // Low-pass filter
-  vel2 = (vel2 * 0.5f) + (vel2_raw * 0.5f);  // Low-pass filter
+  vel1 = (vel1 * 0.4f) + (vel1_raw * 0.6f);  // Low-pass filter
+  vel2 = (vel2 * 0.4f) + (vel2_raw * 0.6f);  // Low-pass filter
   float yawRate = rotev.readYaw() - GYRO_OFFSET;
   heading += yawRate * dT;  // Heading in radians
 
@@ -103,11 +106,11 @@ void loop() {
 
   // Update position controllers
   float v = kPx * (targX - posX);
-  // Max of 2m/s
-  if (v > 200.0f) {
-    v = 200.0f;
-  } else if (v < -200.0f) {
-    v = -200.0f;
+  // Max of 4m/s
+  if (v > 400.0f) {
+    v = 400.0f;
+  } else if (v < -400.0f) {
+    v = -400.0f;
   }
   float w = kPh * heading + kPh_d * yawRate + kPy * posY;  // Heading control
   if (going) {
@@ -177,7 +180,7 @@ Pololu 25D motor:
 - Inductance: 87.3uH
 */
 
-#define BANDWIDTH 120 * 2 * M_PI  // Bandwidth in Hz * 2pi
+#define BANDWIDTH 160 * 2 * M_PI  // Bandwidth in Hz * 2pi
 #define INDUCTANCE 158.5e-6       // Henries
 #define RESISTANCE 3.81           // Ohms
 #define MAX_DUTY 0.95f            // Duty cycle out of 1
