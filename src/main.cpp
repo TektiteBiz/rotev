@@ -57,6 +57,7 @@ float wrapDelta(float delta) {
 }
 
 uint32_t prevTimeMicrosCore1 = 0;
+uint32_t lastPrintCore1 = 0;
 float volt = 0.0f;
 void loop() {
   if (rp2040.fifo.available()) {
@@ -79,13 +80,6 @@ void loop() {
   pos1 += delta1;
   pos2 += delta2;
 
-  Serial.print("heading:" + String(heading));
-  Serial.print(",volt:" + String(volt));
-  Serial.print(",vel1:" + String(vel1));
-  Serial.print(",vel2:" + String(vel2));
-  Serial.print(",pos1:" + String(pos1));
-  Serial.print(",pos2:" + String(pos2));
-  Serial.println();
   if (rotev.stopButtonPressed()) {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
     pushIref(0.0f, true);
@@ -98,7 +92,16 @@ void loop() {
     rotev.ledWrite(0.0f, 0.0f, 0.1f);
   }
 
-  delay(50);
+  if (millis() - lastPrintCore1 > 50) {
+    lastPrintCore1 = millis();
+    Serial.print("heading:" + String(heading));
+    Serial.print(",volt:" + String(volt));
+    Serial.print(",vel1:" + String(vel1));
+    Serial.print(",vel2:" + String(vel2));
+    Serial.print(",pos1:" + String(pos1));
+    Serial.print(",pos2:" + String(pos2));
+    Serial.println();
+  }
 }
 
 /*

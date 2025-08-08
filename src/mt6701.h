@@ -59,11 +59,8 @@ class MT6701 {
     digitalWrite(_csPin, HIGH);
     _spi->endTransaction();
 
-    // The STM32 code had a confusing byte order comment. The MT6701 sends
-    // MSB first, which is standard for Arduino's SPI library with MSBFIRST.
-    // The raw angle is contained in the lower 14 bits of the received word.
-    // Mask the top two bits (Mag-H and Mag-L) to get the 14-bit angle.
-    return received_word & 0x3FFF;
+    // Mask top two bits and shift right 1 to get 14-bit angle
+    return ((received_word >> 1) & 0x3FFF);
   }
 
   /**
