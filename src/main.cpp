@@ -9,6 +9,9 @@ float pos1 = 0.0f;
 float pos2 = 0.0f;
 float heading = 0.0f;
 
+float targVel1 = 0.0f;
+float targVel2 = 0.0f;
+
 const float CM_PER_RAD =
     (2.375f * 2.54f) / 2.0f;  // Wheel radius in cm, given 2.375" dia wheels
 const float GYRO_OFFSET = 0.0202f;
@@ -30,6 +33,7 @@ void setup() {
 
 #define MOTOR1_MULT -1.0f
 #define MOTOR2_MULT 1.0f
+#define MAX_CURR 0.8f
 
 void pushIref(float iref, bool motor1) {
   if (motor1) {
@@ -59,6 +63,9 @@ float wrapDelta(float delta) {
 uint32_t prevTimeMicrosCore1 = 0;
 uint32_t lastPrintCore1 = 0;
 float volt = 0.0f;
+float vel_kP = 0.02f;
+float vel1 = 0.0f;
+float vel2 = 0.0f;
 void loop() {
   if (rp2040.fifo.available()) {
     volt = rp2040.fifo.pop() / 1000.0f;  // Convert from mV to V
@@ -71,8 +78,10 @@ void loop() {
   float angle2 = rotev.enc2Angle();
   float delta1 = wrapDelta(angle1 - prevAngle1) * CM_PER_RAD * MOTOR1_MULT;
   float delta2 = wrapDelta(angle2 - prevAngle2) * CM_PER_RAD * MOTOR2_MULT;
-  float vel1 = delta1 / dT;
-  float vel2 = delta2 / dT;
+  float vel1_raw = delta1 / dT;
+  float vel2_raw = delta2 / dT;
+  vel1 = (vel1 * 0.5f) + (vel1_raw * 0.5f);         // Low-pass filter
+  vel2 = (vel2 * 0.5f) + (vel2_raw * 0.5f);         // Low-pass filter
   heading += (rotev.readYaw() - GYRO_OFFSET) * dT;  // Heading in radians
 
   prevAngle1 = angle1;
@@ -84,13 +93,30 @@ void loop() {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
     pushIref(0.0f, true);
     pushIref(0.0f, false);
+    targVel1 = 0.0f;
+    targVel2 = 0.0f;
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
-    pushIref(0.7f, false);
-    pushIref(0.7f, true);
+    targVel1 = 200.0f;
+    targVel2 = 200.0f;  // 1mph
   } else {
     rotev.ledWrite(0.0f, 0.0f, 0.1f);
   }
+
+  float err1 = (targVel1 - vel1) * vel_kP;
+  if (err1 > MAX_CURR) {
+    err1 = MAX_CURR;
+  } else if (err1 < -MAX_CURR) {
+    err1 = -MAX_CURR;
+  }
+  float err2 = (targVel2 - vel2) * vel_kP;
+  if (err2 > MAX_CURR) {
+    err2 = MAX_CURR;
+  } else if (err2 < -MAX_CURR) {
+    err2 = -MAX_CURR;
+  }
+  pushIref(err1, true);
+  pushIref(err2, false);
 
   if (millis() - lastPrintCore1 > 50) {
     lastPrintCore1 = millis();
