@@ -41,10 +41,10 @@ volatile float posY = 0.0f;
 volatile float yawRate = 0.0f;
 volatile float heading = 0.0f;
 
-float kPx = 1.0f;
+float kPx = 5.0f;
 float kPh = 100.0f;
 float kPh_d = 2.0f;          // Derivative gain for heading control
-float kPy = 0.0f;            // Y error gain -> heading controller
+float kPy = 0.02f;           // Y error gain -> heading controller
 const float targX = 200.0f;  // Target X position in cm
 
 bool going = false;
@@ -62,11 +62,11 @@ void loop() {
 
   // Update position controllers
   float v = kPx * (targX - posX);
-  // Max of 1m/s
-  if (v > 100.0f) {
-    v = 100.0f;
-  } else if (v < -100.0f) {
-    v = -100.0f;
+  // Max of 1.5m/s
+  if (v > 150.0f) {
+    v = 150.0f;
+  } else if (v < -150.0f) {
+    v = -150.0f;
   }
   float posYerr = 0.0f;
   if (posY > 0.05f) {
@@ -228,11 +228,11 @@ void setup1() {
   }
 }
 
-#define VEL_KP 0.03f             // Velocity proportional gain
-#define IREF_MAX_LIN 0.2f        // Max current reference in A
-#define IREF_MAX_DECEL_LIN 0.1f  // Max decel current reference in A
-#define IREF_MAX_ANG 0.2f        // Max current reference in A
-#define IREF_MAX_DECEL_ANG 0.1f
+#define VEL_KP 0.03f               // Velocity proportional gain
+#define IREF_MAX_LIN 0.35f         // Max current reference in A
+#define IREF_MAX_DECEL_LIN 0.175f  // Max decel current reference in A
+#define IREF_MAX_ANG 0.05f         // Max current reference in A
+#define IREF_MAX_DECEL_ANG 0.025f
 
 float vreflin = 0.0f;
 float vrefang = 0.0f;
@@ -291,15 +291,19 @@ void loop1() {
       (currAngVel < 0.0f && vrefang > currAngVel)) {
     irefMaxAng = IREF_MAX_DECEL_ANG;
   }
+
+  float availableCurrent = 0.0f;
   if (ireflin > irefMaxLin) {
     ireflin = irefMaxLin;
   } else if (ireflin < -irefMaxLin) {
     ireflin = -irefMaxLin;
+  } else {
+    availableCurrent = irefMaxLin - fabsf(ireflin);
   }
-  if (irefang > irefMaxAng) {
-    irefang = irefMaxAng;
-  } else if (irefang < -irefMaxAng) {
-    irefang = -irefMaxAng;
+  if (irefang > irefMaxAng + availableCurrent) {
+    irefang = irefMaxAng + availableCurrent;
+  } else if (irefang < -irefMaxAng - availableCurrent) {
+    irefang = -irefMaxAng - availableCurrent;
   }
 
   piUpdate(dt, true, ireflin + irefang, vbus, vel1);
