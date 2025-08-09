@@ -25,11 +25,6 @@ void setup() {
 #define ENC2_MULT 1.0f
 
 void pushVref(float iref, bool motor1) {
-  if (motor1) {
-    iref *= MOTOR1_MULT;
-  } else {
-    iref *= MOTOR2_MULT;
-  }
   int32_t fixed = (int32_t)(iref * 10000.0f);
   uint32_t val = ((uint32_t)fixed << 1);
   if (motor1) {
@@ -134,9 +129,9 @@ void loop() {
   }
   delayMicroseconds(200);  // Run at 5khz max*/
 
-  /*Serial.print("vel1:" + String(vel1, 2));
-  Serial.print(",vel2:" + String(vel2, 2));
-  Serial.println();*/
+  Serial.print("vel1:" + String(vel1 * CM_PER_RAD, 2));
+  Serial.print(",vel2:" + String(vel2 * CM_PER_RAD, 2));
+  Serial.println();
   delay(50);
 }
 
@@ -154,7 +149,7 @@ Pololu 25D motor:
 #define INDUCTANCE 158.5e-6       // Henries
 #define RESISTANCE 3.81           // Ohms
 #define MAX_DUTY 0.95f            // Duty cycle out of 1
-#define RPM_12V 640.0f            // Max RPM of the motor
+#define RPM_12V 620.0f            // Max RPM of the motor
 unsigned long prevTimeMicros = 0;
 unsigned long lastWrite = 0;
 
@@ -196,24 +191,23 @@ void piUpdate(float dt, bool motor1, float iref, float vbus, float vel) {
 
   // Write PWM
   if (motor1) {
-    dd = 0.0f;
     rotev.motorWrite1(dd * MOTOR1_MULT);
   } else {
-    dd = 0.0f;
     rotev.motorWrite2(dd * MOTOR2_MULT);
   }
 
   // Estimate current sign
   float voltageMotor = vel * kV;
   float voltageApplied = dd * vbus;
-  if (!motor1) {
+  /*if (!motor1 && millis() - lastWrite > 50) {
+    lastWrite = millis();
     Serial.print("voltageApplied:" + String(voltageApplied, 2));
     Serial.print(",voltageMotor:" + String(voltageMotor, 2));
     Serial.print(",vel:" + String(vel, 2));
     Serial.print(",curr:" + String(curr, 2));
     Serial.print(",dt:" + String(dt, 5));
     Serial.println();
-  }
+  }*/
   float dir = (voltageApplied - voltageMotor) >= 0 ? 1.0f : -1.0f;
   if (motor1) {
     dirr1 = dir;
@@ -248,8 +242,8 @@ void setup1() {
   }
 }
 
-#define VEL_KP 0.0075f  // Velocity proportional gain
-#define IREF_MAX 0.3f   // Max current reference in A
+#define VEL_KP 0.06f   // Velocity proportional gain
+#define IREF_MAX 0.3f  // Max current reference in A
 
 float vref1 = 0.0f;
 float vref2 = 0.0f;
@@ -257,6 +251,7 @@ void loop1() {
   float vbus = rotev.getVoltage();
   float dt =
       (float)(micros() - prevTimeMicros) / 1000000.0f;  // Convert to seconds
+  prevTimeMicros = micros();
 
   // Update velocities
   float angle1 = rotev.enc1Angle();
@@ -291,7 +286,7 @@ void loop1() {
   posY = newPosY;
 
   // Update velocity PID
-  /*float iref1 = (vref1 - vel1) * VEL_KP;
+  float iref1 = (vref1 - vel1) * VEL_KP;
   if (iref1 > IREF_MAX) {
     iref1 = IREF_MAX;
   } else if (iref1 < -IREF_MAX) {
@@ -302,15 +297,10 @@ void loop1() {
     iref2 = IREF_MAX;
   } else if (iref2 < -IREF_MAX) {
     iref2 = -IREF_MAX;
-  }*/
-  float iref1 = 0.0f;
-  float iref2 = 0.0f;
+  }
 
   piUpdate(dt, true, iref1, vbus, vel1);
   piUpdate(dt, false, iref2, vbus, vel2);
-  prevTimeMicros = micros();
-  // delayMicroseconds(200);  // Run at 5khz max
-  delay(10);
 
   // Send over voltage data every 50ms
   if (millis() - lastWrite > 50) {
@@ -330,4 +320,22 @@ void loop1() {
       vref2 = vref / CM_PER_RAD;
     }
   }
+
+  /*if (going) {
+    float dd = sinf(millis() / 1000.0f * 10.0f);  // Example input signal
+    rotev.motorWrite2(dd * MOTOR2_MULT);
+    float curr = rotev.motorCurr2() * dirr2;
+    float voltageMotor = vel2 * kV;
+    float voltageApplied = dd * vbus;
+    dirr2 = (voltageApplied - voltageMotor) >= 0 ? 1.0f : -1.0f;
+    Serial.print("voltageApplied:" + String(voltageApplied, 2));
+    Serial.print(",voltageMotor:" + String(voltageMotor, 2));
+    Serial.print(",vel:" + String(vel2 * 0.1f, 2));
+    Serial.print(",curr:" + String(curr * 60.0f, 2));
+    Serial.print(",dt:" + String(dt, 5));
+    Serial.println();
+    delay(50);
+  } else {
+    rotev.motorWrite2(0.0f);
+  }*/
 }
