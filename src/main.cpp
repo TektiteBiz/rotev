@@ -154,7 +154,7 @@ Pololu 25D motor:
 #define INDUCTANCE 158.5e-6       // Henries
 #define RESISTANCE 3.81           // Ohms
 #define MAX_DUTY 0.95f            // Duty cycle out of 1
-#define RPM_12V 500.0f            // Max RPM of the motor
+#define RPM_12V 640.0f            // Max RPM of the motor
 unsigned long prevTimeMicros = 0;
 unsigned long lastWrite = 0;
 
@@ -194,28 +194,24 @@ void piUpdate(float dt, bool motor1, float iref, float vbus, float vel) {
     }
   }
 
-  dd = 0.1f;
-  if (motor1) {
-    dd *= MOTOR1_MULT;
-  } else {
-    dd *= MOTOR2_MULT;
-  }
-
   // Write PWM
   if (motor1) {
-    rotev.motorWrite1(dd);
+    dd = 0.0f;
+    rotev.motorWrite1(dd * MOTOR1_MULT);
   } else {
-    rotev.motorWrite2(dd);
+    dd = 0.0f;
+    rotev.motorWrite2(dd * MOTOR2_MULT);
   }
 
   // Estimate current sign
   float voltageMotor = vel * kV;
   float voltageApplied = dd * vbus;
-  if (motor1) {
+  if (!motor1) {
     Serial.print("voltageApplied:" + String(voltageApplied, 2));
     Serial.print(",voltageMotor:" + String(voltageMotor, 2));
     Serial.print(",vel:" + String(vel, 2));
     Serial.print(",curr:" + String(curr, 2));
+    Serial.print(",dt:" + String(dt, 5));
     Serial.println();
   }
   float dir = (voltageApplied - voltageMotor) >= 0 ? 1.0f : -1.0f;
