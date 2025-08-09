@@ -34,7 +34,7 @@ void setup() {
 #define MOTOR2_MULT -1.0f
 #define ENC1_MULT -1.0f
 #define ENC2_MULT 1.0f
-#define MAX_CURR 0.92f
+#define MAX_CURR 0.3f
 
 void pushIref(float iref, bool motor1) {
   if (motor1) {
@@ -64,18 +64,19 @@ float wrapDelta(float delta) {
 uint32_t prevTimeMicrosCore1 = 0;
 uint32_t lastPrintCore1 = 0;
 float volt = 0.0f;
-float vel_kP = 0.015f;
+float vel_kP = 0.0075f;
 float vel1 = 0.0f;
 float vel2 = 0.0f;
 
 float posX = 0.0f;
 float posY = 0.0f;
 
-float kPx = 3.0f;
-float kPh = 400.0f;
-float kPh_d = 100.0f;        // Derivative gain for heading control
-float kPy = 50.0f;           // Y error gain
-const float targX = 700.0f;  // Target X position in cm
+float kPx = 4.0f;
+float kPh = 50.0f;
+float kPh_d = 2.0f;           // Derivative gain for heading control
+float kPy = 0.00f;            // Y error gain -> heading controller
+const float targX = -100.0f;  // Target X position in cm
+float yawRate = 0.0f;
 
 bool going = false;
 
@@ -94,10 +95,19 @@ void loop() {
   float delta2 = wrapDelta(angle2 - prevAngle2) * CM_PER_RAD * ENC2_MULT;
   float vel1_raw = delta1 / dT;
   float vel2_raw = delta2 / dT;
-  vel1 = (vel1 * 0.4f) + (vel1_raw * 0.6f);  // Low-pass filter
-  vel2 = (vel2 * 0.4f) + (vel2_raw * 0.6f);  // Low-pass filter
-  float yawRate = rotev.readYaw() - GYRO_OFFSET;
-  heading += yawRate * dT;  // Heading in radians
+  vel1 = (vel1 * 0.7f) + (vel1_raw * 0.3f);  // Low-pass filter (160 hz cutoff)
+  vel2 = (vel2 * 0.7f) + (vel2_raw * 0.3f);  // Low-pass filter (160 hz cutoff)
+  // Update velocities
+  vel1 = vel1_raw;
+  vel2 = vel2_raw;
+  float yawRate_raw = rotev.readYaw() - GYRO_OFFSET;
+  yawRate = (yawRate * 0.6f) + (yawRate_raw * 0.4f);  // Low-pass filter
+  heading += yawRate_raw * dT;                        // Heading in radians
+  if (heading < -M_PI) {
+    heading += 2 * M_PI;
+  } else if (heading > M_PI) {
+    heading -= 2 * M_PI;
+  }
 
   // Calculate position from deltas and heading
   float delPos = (delta1 + delta2) / 2.0f;
@@ -106,16 +116,16 @@ void loop() {
 
   // Update position controllers
   float v = kPx * (targX - posX);
-  // Max of 4m/s
-  if (v > 400.0f) {
-    v = 400.0f;
-  } else if (v < -400.0f) {
-    v = -400.0f;
+  // Max of 1m/s
+  if (v > 100.0f) {
+    v = 100.0f;
+  } else if (v < -100.0f) {
+    v = -100.0f;
   }
-  float w = kPh * heading + kPh_d * yawRate + kPy * posY;  // Heading control
+  float w = kPh * (heading + kPy * posY) + kPh_d * yawRate;  // Heading control
   if (going) {
-    targVel1 = v + w;
-    targVel2 = v - w;
+    targVel1 = targVel1 * 0.95f + 0.05f * (v + w);
+    targVel2 = targVel2 * 0.95f + 0.05f * (v - w);
   } else {
     targVel1 = 0.0f;
     targVel2 = 0.0f;
@@ -141,6 +151,8 @@ void loop() {
     posX = 0.0f;
     posY = 0.0f;
     heading = 0.0f;
+    targVel1 = 0.0f;
+    targVel2 = 0.0f;
   }
 
   float err1 = (targVel1 - vel1) * vel_kP;
@@ -166,8 +178,12 @@ void loop() {
     Serial.print(",vel2:" + String(vel2));
     Serial.print(",posX:" + String(posX));
     Serial.print(",posY:" + String(posY));
+    Serial.print(",dT:" + String(dT, 10));
+    Serial.print(",targVel1:" + String(targVel1));
+    Serial.print(",targVel2:" + String(targVel2));
     Serial.println();
   }
+  delayMicroseconds(200);  // Run at 5khz max
 }
 
 /*
