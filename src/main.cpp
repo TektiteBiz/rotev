@@ -21,10 +21,10 @@ void setup() {
 #define ENC1_MULT -1.0f
 #define ENC2_MULT 1.0f
 
-void pushVref(float iref, bool motor1) {
+void pushVref(float iref, bool linvel) {
   int32_t fixed = (int32_t)(iref * 10000.0f);
   uint32_t val = ((uint32_t)fixed << 1);
-  if (motor1) {
+  if (linvel) {
     val |= 0x1;  // Set bit 0 for motor 1
   } else {
     val &= ~0x1;  // Clear bit 0 for motor 2
@@ -44,7 +44,7 @@ volatile float heading = 0.0f;
 float kPx = 1.0f;
 float kPh = 100.0f;
 float kPh_d = 2.0f;          // Derivative gain for heading control
-float kPy = 0.02f;           // Y error gain -> heading controller
+float kPy = 0.0f;            // Y error gain -> heading controller
 const float targX = 200.0f;  // Target X position in cm
 
 bool going = false;
@@ -76,12 +76,10 @@ void loop() {
   }
   float w = kPh * (heading + posYerr) + kPh_d * yawRate;  // Heading control
   if (going) {
-    // targVel1 = targVel1 * 0.95f + 0.05f * (v + w);
-    // targVel2 = targVel2 * 0.95f + 0.05f * (v - w);
-    targVel1 = v + w;
-    targVel2 = v - w;
-    pushVref(targVel1 * CM_PER_RAD, true);
-    pushVref(targVel2 * CM_PER_RAD, false);
+    targVel1 = v;
+    targVel2 = w;  // Right motor goes faster
+    pushVref(v, true);
+    pushVref(w, false);
   } else {
     pushVref(0.0f, true);
     pushVref(0.0f, false);
@@ -112,12 +110,12 @@ void loop() {
     lastPrintCore1 = millis();
     Serial.print("heading:" + String(heading));
     Serial.print(",volt:" + String(volt));
-    Serial.print(",vel1:" + String(vel1));
-    Serial.print(",vel2:" + String(vel2));
+    Serial.print(",linvel:" + String((vel1 + vel2) / 2.0f * CM_PER_RAD));
+    Serial.print(",angvel:" + String((vel2 - vel1) / 2.0f * CM_PER_RAD));
     Serial.print(",posX:" + String(posX));
     Serial.print(",posY:" + String(posY));
-    Serial.print(",targVel1:" + String(targVel1));
-    Serial.print(",targVel2:" + String(targVel2));
+    Serial.print(",targlinvel:" + String(targVel1));
+    Serial.print(",targangvel:" + String(targVel2));
     Serial.println();
   }
   delayMicroseconds(200);  // Run at 5khz max
@@ -230,12 +228,14 @@ void setup1() {
   }
 }
 
-#define VEL_KP 0.03f         // Velocity proportional gain
-#define IREF_MAX 0.4f        // Max current reference in A
-#define IREF_MAX_DECEL 0.2f  // Max decel current reference in A
+#define VEL_KP 0.03f             // Velocity proportional gain
+#define IREF_MAX_LIN 0.2f        // Max current reference in A
+#define IREF_MAX_DECEL_LIN 0.1f  // Max decel current reference in A
+#define IREF_MAX_ANG 0.2f        // Max current reference in A
+#define IREF_MAX_DECEL_ANG 0.1f
 
-float vref1 = 0.0f;
-float vref2 = 0.0f;
+float vreflin = 0.0f;
+float vrefang = 0.0f;
 void loop1() {
   float vbus = rotev.getVoltage();
   float dt =
@@ -275,33 +275,35 @@ void loop1() {
   posY = newPosY;
 
   // Update velocity PID
-  float iref1 = (vref1 - vel1) * VEL_KP;
-  float iref2 = (vref2 - vel2) * VEL_KP;
+  float currLinVel = (vel1 + vel2) / 2.0f;  // Average linear velocity
+  float currAngVel = (vel1 - vel2) / 2.0f;  // Average angular velocity
+  float ireflin = (vreflin - currLinVel) * VEL_KP;
+  float irefang = (vrefang - currAngVel) * VEL_KP;
 
   // Current limiting based on accel vs decel
-  float irefMax = IREF_MAX;
-  if ((vel1 > 0.0f && vref1 < vel1) || (vel1 < 0.0f && vref1 > vel1)) {
-    irefMax = IREF_MAX_DECEL;
+  float irefMaxLin = IREF_MAX_LIN;
+  float irefMaxAng = IREF_MAX_ANG;
+  if ((currLinVel > 0.0f && vreflin < currLinVel) ||
+      (currLinVel < 0.0f && vreflin > currLinVel)) {
+    irefMaxLin = IREF_MAX_DECEL_LIN;
   }
-  if (iref1 > irefMax) {
-    iref1 = irefMax;
-  } else if (iref1 < -irefMax) {
-    iref1 = -irefMax;
+  if ((currAngVel > 0.0f && vrefang < currAngVel) ||
+      (currAngVel < 0.0f && vrefang > currAngVel)) {
+    irefMaxAng = IREF_MAX_DECEL_ANG;
   }
-  if ((vel2 > 0.0f && vref2 < vel2 - 10.0f) ||
-      (vel2 < 0.0f && vref2 > vel2 + 10.0f)) {
-    irefMax = IREF_MAX_DECEL;
-  } else {
-    irefMax = IREF_MAX;
+  if (ireflin > irefMaxLin) {
+    ireflin = irefMaxLin;
+  } else if (ireflin < -irefMaxLin) {
+    ireflin = -irefMaxLin;
   }
-  if (iref2 > irefMax) {
-    iref2 = irefMax;
-  } else if (iref2 < -irefMax) {
-    iref2 = -irefMax;
+  if (irefang > irefMaxAng) {
+    irefang = irefMaxAng;
+  } else if (irefang < -irefMaxAng) {
+    irefang = -irefMaxAng;
   }
 
-  piUpdate(dt, true, iref1, vbus, vel1);
-  piUpdate(dt, false, iref2, vbus, vel2);
+  piUpdate(dt, true, ireflin + irefang, vbus, vel1);
+  piUpdate(dt, false, ireflin - irefang, vbus, vel2);
 
   // Send over voltage data every 50ms
   if (millis() - lastWrite > 50) {
@@ -312,13 +314,13 @@ void loop1() {
   // Check for vref
   while (rp2040.fifo.available() > 0) {
     uint32_t val = rp2040.fifo.pop();
-    bool motor1 = (val & 0x1) != 0;
+    bool linvel = (val & 0x1) != 0;
     int32_t fixed = ((int32_t)val) >> 1;  // Remove motor bit
     float vref = fixed / 10000.0f;
-    if (motor1) {
-      vref1 = vref / CM_PER_RAD;
+    if (linvel) {
+      vreflin = vref / CM_PER_RAD;
     } else {
-      vref2 = vref / CM_PER_RAD;
+      vrefang = vref / CM_PER_RAD;
     }
   }
 
