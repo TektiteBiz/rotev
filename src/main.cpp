@@ -10,9 +10,6 @@ const float GYRO_OFFSET = 0.0202f;
 
 void setup() {
   rotev.begin();
-  rotev.motorEnable(true);
-  rotev.motorWrite1(0.0f);
-  rotev.motorWrite2(0.0f);
   rotev.servoWrite(25.0f);  // 25: closed, 180: open
 
   rp2040.fifo.push(0);  // Send ready signal
@@ -44,11 +41,11 @@ volatile float posY = 0.0f;
 volatile float yawRate = 0.0f;
 volatile float heading = 0.0f;
 
-float kPx = 4.0f;
+float kPx = 1.0f;
 float kPh = 50.0f;
 float kPh_d = 2.0f;          // Derivative gain for heading control
 float kPy = 0.00f;           // Y error gain -> heading controller
-const float targX = 100.0f;  // Target X position in cm
+const float targX = 200.0f;  // Target X position in cm
 
 bool going = false;
 
@@ -56,33 +53,36 @@ bool goPressed = false;
 
 extern float vel1;
 extern float vel2;
+float targVel1 = 0.0f;  // Target velocity for motor 1
+float targVel2 = 0.0f;  // Target velocity for motor 2
 void loop() {
   if (rp2040.fifo.available()) {
     volt = rp2040.fifo.pop() / 1000.0f;  // Convert from mV to V
   }
 
-  /*// Update position controllers
+  // Update position controllers
   float v = kPx * (targX - posX);
-  // Max of 1m/s
-  if (v > 100.0f) {
-    v = 100.0f;
-  } else if (v < -100.0f) {
-    v = -100.0f;
+  // Max of 0.5m/s
+  if (v > 50.0f) {
+    v = 50.0f;
+  } else if (v < -50.0f) {
+    v = -50.0f;
   }
   float w = kPh * (heading + kPy * posY) + kPh_d * yawRate;  // Heading control
   if (going) {
     targVel1 = targVel1 * 0.95f + 0.05f * (v + w);
     targVel2 = targVel2 * 0.95f + 0.05f * (v - w);
+    pushVref(targVel1 * CM_PER_RAD, true);
+    pushVref(targVel2 * CM_PER_RAD, false);
   } else {
-    targVel1 = 0.0f;
-    targVel2 = 0.0f;
-  }*/
+    pushVref(0.0f, true);
+    pushVref(0.0f, false);
+  }
 
   if (rotev.stopButtonPressed()) {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
-    pushVref(0.0f, true);
-    pushVref(0.0f, false);
     going = false;
+    rotev.motorEnable(true);
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
     goPressed = true;
@@ -95,24 +95,10 @@ void loop() {
     posX = 0.0f;
     posY = 0.0f;
     heading = 0.0f;
-    pushVref(50.0f, true);
-    pushVref(50.0f, false);
+    targVel1 = 0.0f;
+    targVel2 = 0.0f;
+    rotev.motorEnable(true);
   }
-
-  /*float err1 = (targVel1 - vel1) * vel_kP;
-  if (err1 > MAX_CURR) {
-    err1 = MAX_CURR;
-  } else if (err1 < -MAX_CURR) {
-    err1 = -MAX_CURR;
-  }
-  float err2 = (targVel2 - vel2) * vel_kP;
-  if (err2 > MAX_CURR) {
-    err2 = MAX_CURR;
-  } else if (err2 < -MAX_CURR) {
-    err2 = -MAX_CURR;
-  }
-  pushIref(err1, true);
-  pushIref(err2, false);
 
   if (millis() - lastPrintCore1 > 50) {
     lastPrintCore1 = millis();
@@ -122,17 +108,11 @@ void loop() {
     Serial.print(",vel2:" + String(vel2));
     Serial.print(",posX:" + String(posX));
     Serial.print(",posY:" + String(posY));
-    Serial.print(",dT:" + String(dT, 10));
     Serial.print(",targVel1:" + String(targVel1));
     Serial.print(",targVel2:" + String(targVel2));
     Serial.println();
   }
-  delayMicroseconds(200);  // Run at 5khz max*/
-
-  Serial.print("vel1:" + String(vel1 * CM_PER_RAD, 2));
-  Serial.print(",vel2:" + String(vel2 * CM_PER_RAD, 2));
-  Serial.println();
-  delay(50);
+  delayMicroseconds(200);  // Run at 5khz max
 }
 
 /*
@@ -242,8 +222,9 @@ void setup1() {
   }
 }
 
-#define VEL_KP 0.06f   // Velocity proportional gain
-#define IREF_MAX 0.3f  // Max current reference in A
+#define VEL_KP 0.03f         // Velocity proportional gain
+#define IREF_MAX 0.3f        // Max current reference in A
+#define IREF_MAX_DECEL 0.0f  // Max decel current reference in A
 
 float vref1 = 0.0f;
 float vref2 = 0.0f;
@@ -287,16 +268,29 @@ void loop1() {
 
   // Update velocity PID
   float iref1 = (vref1 - vel1) * VEL_KP;
-  if (iref1 > IREF_MAX) {
-    iref1 = IREF_MAX;
-  } else if (iref1 < -IREF_MAX) {
-    iref1 = -IREF_MAX;
-  }
   float iref2 = (vref2 - vel2) * VEL_KP;
-  if (iref2 > IREF_MAX) {
-    iref2 = IREF_MAX;
-  } else if (iref2 < -IREF_MAX) {
-    iref2 = -IREF_MAX;
+
+  // Current limiting based on accel vs decel
+  float irefMax = IREF_MAX;
+  if ((vel1 > 0.0f && vref1 < vel1 - 10.0f) ||
+      (vel1 < 0.0f && vref1 > vel1 + 10.0f)) {
+    irefMax = IREF_MAX_DECEL;
+  }
+  if (iref1 > irefMax) {
+    iref1 = irefMax;
+  } else if (iref1 < -irefMax) {
+    iref1 = -irefMax;
+  }
+  if ((vel2 > 0.0f && vref2 < vel2 - 10.0f) ||
+      (vel2 < 0.0f && vref2 > vel2 + 10.0f)) {
+    irefMax = IREF_MAX_DECEL;
+  } else {
+    irefMax = IREF_MAX;
+  }
+  if (iref2 > irefMax) {
+    iref2 = irefMax;
+  } else if (iref2 < -irefMax) {
+    iref2 = -irefMax;
   }
 
   piUpdate(dt, true, iref1, vbus, vel1);
