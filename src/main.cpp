@@ -42,9 +42,9 @@ volatile float yawRate = 0.0f;
 volatile float heading = 0.0f;
 
 float kPx = 1.0f;
-float kPh = 50.0f;
+float kPh = 100.0f;
 float kPh_d = 2.0f;          // Derivative gain for heading control
-float kPy = 0.00f;           // Y error gain -> heading controller
+float kPy = 0.02f;           // Y error gain -> heading controller
 const float targX = 200.0f;  // Target X position in cm
 
 bool going = false;
@@ -62,16 +62,24 @@ void loop() {
 
   // Update position controllers
   float v = kPx * (targX - posX);
-  // Max of 0.5m/s
-  if (v > 50.0f) {
-    v = 50.0f;
-  } else if (v < -50.0f) {
-    v = -50.0f;
+  // Max of 1m/s
+  if (v > 100.0f) {
+    v = 100.0f;
+  } else if (v < -100.0f) {
+    v = -100.0f;
   }
-  float w = kPh * (heading + kPy * posY) + kPh_d * yawRate;  // Heading control
+  float posYerr = 0.0f;
+  if (posY > 0.05f) {
+    posYerr = kPy * sqrtf(posY);
+  } else if (posY < -0.05f) {
+    posYerr = kPy * sqrtf(-posY);
+  }
+  float w = kPh * (heading + posYerr) + kPh_d * yawRate;  // Heading control
   if (going) {
-    targVel1 = targVel1 * 0.95f + 0.05f * (v + w);
-    targVel2 = targVel2 * 0.95f + 0.05f * (v - w);
+    // targVel1 = targVel1 * 0.95f + 0.05f * (v + w);
+    // targVel2 = targVel2 * 0.95f + 0.05f * (v - w);
+    targVel1 = v + w;
+    targVel2 = v - w;
     pushVref(targVel1 * CM_PER_RAD, true);
     pushVref(targVel2 * CM_PER_RAD, false);
   } else {
@@ -82,7 +90,7 @@ void loop() {
   if (rotev.stopButtonPressed()) {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
     going = false;
-    rotev.motorEnable(true);
+    rotev.motorEnable(false);
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
     goPressed = true;
@@ -223,8 +231,8 @@ void setup1() {
 }
 
 #define VEL_KP 0.03f         // Velocity proportional gain
-#define IREF_MAX 0.3f        // Max current reference in A
-#define IREF_MAX_DECEL 0.0f  // Max decel current reference in A
+#define IREF_MAX 0.4f        // Max current reference in A
+#define IREF_MAX_DECEL 0.2f  // Max decel current reference in A
 
 float vref1 = 0.0f;
 float vref2 = 0.0f;
@@ -272,8 +280,7 @@ void loop1() {
 
   // Current limiting based on accel vs decel
   float irefMax = IREF_MAX;
-  if ((vel1 > 0.0f && vref1 < vel1 - 10.0f) ||
-      (vel1 < 0.0f && vref1 > vel1 + 10.0f)) {
+  if ((vel1 > 0.0f && vref1 < vel1) || (vel1 < 0.0f && vref1 > vel1)) {
     irefMax = IREF_MAX_DECEL;
   }
   if (iref1 > irefMax) {
