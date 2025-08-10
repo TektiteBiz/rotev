@@ -10,7 +10,7 @@ const float GYRO_OFFSET = 0.0202f;
 
 void setup() {
   rotev.begin();
-  rotev.servoWrite(25.0f);  // 25: closed, 180: open
+  rotev.servoWrite(180.0f);  // 25: closed, 180: open
 
   rp2040.fifo.push(0);  // Send ready signal
 }
@@ -45,9 +45,17 @@ float kPx = 5.0f;
 float kPh = 50.0f;
 float kPh_d = 2.0f;  // Derivative gain for heading control
 
-float targX[4] = {100.0f, 100.0f, 0.0f, 0.0f};  // Target position in cm
-float targY[4] = {0.0f, 100.0f, 100.0f, 0.0f};  // Target position in cm
+#define TARG_COUNT 13
+float targX[TARG_COUNT] = {
+    100.0f, 100.0f, 0.0f,   0.0f,   100.0f, 100.0f, 0.0f,
+    0.0f,   100.0f, 100.0f, -50.0f, -50.0f, 0.0f};  // Target position in cm
+float targY[TARG_COUNT] = {
+    0.0f, 100.0f, 100.0f, 0.0f,   0.0f, 100.0f, 100.0f,
+    0.0f, 0.0f,   100.0f, 100.0f, 0.0f, 0.0f};  // Target position in cm
 int currTarg = 0;
+
+#define MAX_VEL 50.0f
+#define MAX_ANG_VEL 25.0f
 
 bool going = false;
 
@@ -66,7 +74,7 @@ void loop() {
   float xErr = targX[currTarg] - posX;
   float yErr = targY[currTarg] - posY;
   float posErr = sqrtf(xErr * xErr + yErr * yErr);
-  if (currTarg < 3 && posErr < 16.0f) {
+  if (currTarg < TARG_COUNT - 1 && posErr < 16.0f) {
     currTarg++;
   }
   // Calculate heading to target
@@ -80,17 +88,16 @@ void loop() {
 
   // Update position controllers
   float v = kPx * posErr;
-  // Max of 1.5m/s
-  if (v > 100.0f) {
-    v = 100.0f;
-  } else if (v < -100.0f) {
-    v = -100.0f;
+  if (v > MAX_VEL) {
+    v = MAX_VEL;
+  } else if (v < -MAX_VEL) {
+    v = -MAX_VEL;
   }
   float w = kPh * headingErr + kPh_d * yawRate;  // Heading control
-  if (w > 150.0f) {  // Max 1.5m/s diff between wheel speed
-    w = 150.0f;
-  } else if (w < -150.0f) {
-    w = -150.0f;
+  if (w > MAX_ANG_VEL) {  // Max 0.25m/s diff between wheel speed
+    w = MAX_ANG_VEL;
+  } else if (w < -MAX_ANG_VEL) {
+    w = -MAX_ANG_VEL;
   }
   if (going) {
     targVel1 = v;
@@ -106,6 +113,7 @@ void loop() {
     rotev.ledWrite(0.1f, 0.0f, 0.0f);
     going = false;
     rotev.motorEnable(false);
+    rotev.servoWrite(180.0f);
   } else if (rotev.goButtonPressed()) {
     rotev.ledWrite(0.0f, 0.1f, 0.0f);
     goPressed = true;
@@ -122,6 +130,7 @@ void loop() {
     targVel2 = 0.0f;
     currTarg = 0;
     rotev.motorEnable(true);
+    rotev.servoWrite(25.0f);
   }
 
   if (millis() - lastPrintCore1 > 50) {
@@ -246,11 +255,25 @@ void setup1() {
   }
 }
 
-#define VEL_KP 0.03f              // Velocity proportional gain
-#define IREF_MAX_LIN 0.25f        // Max current reference in A
-#define IREF_MAX_DECEL_LIN 0.15f  // Max decel current reference in A
-#define IREF_MAX_ANG 0.1f         // Max current reference in A
-#define IREF_MAX_DECEL_ANG 0.05f
+#define VEL_KP 0.03f  // Velocity proportional gain
+
+// Past this it slips
+#define IREF_MAX 0.3f
+#define IREF_MAX_DECEL 0.1f
+
+#define IREF_MAX_LIN 0.25f  // Max lin accel, leaves at least 0.1A for turning
+#define IREF_MAX_DECEL_LIN 0.05f  // Max lin decel, 0.05A for turning
+
+#define IREF_FRICTION 0.15f  // Current to overcome friction, 0.15A
+
+float clampMagnitude(float val, float max) {
+  if (val > max) {
+    return max;
+  } else if (val < -max) {
+    return -max;
+  }
+  return val;
+}
 
 float vreflin = 0.0f;
 float vrefang = 0.0f;
@@ -300,28 +323,28 @@ void loop1() {
 
   // Current limiting based on accel vs decel
   float irefMaxLin = IREF_MAX_LIN;
-  float irefMaxAng = IREF_MAX_ANG;
   if ((currLinVel > 0.0f && vreflin < currLinVel) ||
       (currLinVel < 0.0f && vreflin > currLinVel)) {
     irefMaxLin = IREF_MAX_DECEL_LIN;
   }
-  if ((currAngVel > 0.0f && vrefang < currAngVel) ||
-      (currAngVel < 0.0f && vrefang > currAngVel)) {
-    irefMaxAng = IREF_MAX_DECEL_ANG;
-  }
 
-  // float availableCurrent = 0.0f;
-  if (ireflin > irefMaxLin) {
-    ireflin = irefMaxLin;
-  } else if (ireflin < -irefMaxLin) {
-    ireflin = -irefMaxLin;
+  // Limit current for lin vel
+  ireflin = clampMagnitude(ireflin, irefMaxLin);
+
+  // Limit current per motor, to achieve irefang current limiting
+  float iref1 = ireflin + irefang;
+  float iref2 = ireflin - irefang;
+  if (vel1 > 0.0f && ireflin < IREF_FRICTION ||
+      vel1 < 0.0f && ireflin > -IREF_FRICTION) {  // Trying to decel (wheel 1)
+    iref1 = clampMagnitude(iref1, IREF_MAX_DECEL);
   } else {
-    // availableCurrent = irefMaxLin - fabsf(ireflin);
+    iref1 = clampMagnitude(iref1, IREF_MAX);
   }
-  if (irefang > irefMaxAng) {
-    irefang = irefMaxAng;
-  } else if (irefang < -irefMaxAng) {
-    irefang = -irefMaxAng;
+  if (vel2 > 0.0f && ireflin < IREF_FRICTION ||
+      vel2 < 0.0f && ireflin > -IREF_FRICTION) {  // Trying to decel (wheel 2)
+    iref2 = clampMagnitude(iref2, IREF_MAX_DECEL);
+  } else {
+    iref2 = clampMagnitude(iref2, IREF_MAX);
   }
 
   piUpdate(dt, true, ireflin + irefang, vbus, vel1);
