@@ -41,21 +41,26 @@ volatile float posY = 0.0f;
 volatile float yawRate = 0.0f;
 volatile float heading = 0.0f;
 
-float kPx = 5.0f;
+float kPx = 3.0f;
 float kPh = 50.0f;
 float kPh_d = 2.0f;  // Derivative gain for heading control
 
-#define TARG_COUNT 13
-float targX[TARG_COUNT] = {
-    100.0f, 100.0f, 0.0f,   0.0f,   100.0f, 100.0f, 0.0f,
-    0.0f,   100.0f, 100.0f, -50.0f, -50.0f, 0.0f};  // Target position in cm
-float targY[TARG_COUNT] = {
-    0.0f, 100.0f, 100.0f, 0.0f,   0.0f, 100.0f, 100.0f,
-    0.0f, 0.0f,   100.0f, 100.0f, 0.0f, 0.0f};  // Target position in cm
+#define TARG_COUNT 17
+float
+    targX[TARG_COUNT] =
+        {
+            100.0f, 100.0f, 0.0f,   0.0f,   100.0f, 100.0f,
+            0.0f,   100.0f, 100.0f, 0.0f,   0.0f,   0.0f,
+            100.0f, 100.0f, -50.0f, -50.0f, 0.0f};  // Target position in cm
+float targY[TARG_COUNT] = {0.0f,   100.0f, 100.0f, 0.0f,   0.0f, 100.0f,
+                           100.0f, 0.0f,   100.0f, 100.0f, 0.0f, 0.0f,
+                           0.0f,   100.0f, 100.0f, 0.0f,   0.0f};  // Target
+                                                                   // position
+                                                                   // in cm
 int currTarg = 0;
 
-#define MAX_VEL 50.0f
-#define MAX_ANG_VEL 25.0f
+#define MAX_VEL 150.0f
+#define MAX_ANG_VEL 30.0f
 
 bool going = false;
 
@@ -259,10 +264,10 @@ void setup1() {
 
 // Past this it slips
 #define IREF_MAX 0.3f
-#define IREF_MAX_DECEL 0.1f
+#define IREF_MAX_DECEL 0.15f
 
 #define IREF_MAX_LIN 0.25f  // Max lin accel, leaves at least 0.1A for turning
-#define IREF_MAX_DECEL_LIN 0.05f  // Max lin decel, 0.05A for turning
+#define IREF_MAX_DECEL_LIN 0.1f  // Max lin decel, 0.05A for turning
 
 #define IREF_FRICTION 0.15f  // Current to overcome friction, 0.15A
 
