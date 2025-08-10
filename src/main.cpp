@@ -45,18 +45,17 @@ float kPx = 3.0f;
 float kPh = 50.0f;
 float kPh_d = 2.0f;  // Derivative gain for heading control
 
-#define TARG_COUNT 17
-float
-    targX[TARG_COUNT] =
-        {
-            100.0f, 100.0f, 0.0f,   0.0f,   100.0f, 100.0f,
-            0.0f,   100.0f, 100.0f, 0.0f,   0.0f,   0.0f,
-            100.0f, 100.0f, -50.0f, -50.0f, 0.0f};  // Target position in cm
-float targY[TARG_COUNT] = {0.0f,   100.0f, 100.0f, 0.0f,   0.0f, 100.0f,
-                           100.0f, 0.0f,   100.0f, 100.0f, 0.0f, 0.0f,
-                           0.0f,   100.0f, 100.0f, 0.0f,   0.0f};  // Target
-                                                                   // position
-                                                                   // in cm
+#define TARG_COUNT 18
+float targX[TARG_COUNT] =
+    {
+        100.0f, 100.0f, 0.0f,   0.0f,   100.0f, 100.0f,
+        0.0f,   0.0f,   100.0f, 100.0f, 0.0f,   0.0f,
+        0.0f,   100.0f, 100.0f, -50.0f, -50.0f, 4.5f};  // Target position in cm
+float targY[TARG_COUNT] = {0.0f,   100.0f, 100.0f, 0.0f,   0.0f, 100.0f, 100.0f,
+                           0.0f,   0.0f,   100.0f, 100.0f, 0.0f, 0.0f,   0.0f,
+                           100.0f, 100.0f, 0.0f,   -1.25f};  // Target
+                                                             // position
+                                                             // in cm
 int currTarg = 0;
 
 #define MAX_VEL 150.0f
