@@ -42,10 +42,12 @@ volatile float yawRate = 0.0f;
 volatile float heading = 0.0f;
 
 float kPx = 5.0f;
-float kPh = 100.0f;
-float kPh_d = 2.0f;          // Derivative gain for heading control
-float kPy = 0.02f;           // Y error gain -> heading controller
-const float targX = 200.0f;  // Target X position in cm
+float kPh = 50.0f;
+float kPh_d = 2.0f;  // Derivative gain for heading control
+
+float targX[4] = {100.0f, 100.0f, 0.0f, 0.0f};  // Target position in cm
+float targY[4] = {0.0f, 100.0f, 100.0f, 0.0f};  // Target position in cm
+int currTarg = 0;
 
 bool going = false;
 
@@ -60,24 +62,39 @@ void loop() {
     volt = rp2040.fifo.pop() / 1000.0f;  // Convert from mV to V
   }
 
+  // Calculate heading & position err
+  float xErr = targX[currTarg] - posX;
+  float yErr = targY[currTarg] - posY;
+  float posErr = sqrtf(xErr * xErr + yErr * yErr);
+  if (currTarg < 3 && posErr < 16.0f) {
+    currTarg++;
+  }
+  // Calculate heading to target
+  float headingErr = heading - atan2f(yErr, xErr);
+  while (headingErr < -M_PI) {
+    headingErr += 2 * M_PI;
+  }
+  while (headingErr > M_PI) {
+    headingErr -= 2 * M_PI;
+  }
+
   // Update position controllers
-  float v = kPx * (targX - posX);
+  float v = kPx * posErr;
   // Max of 1.5m/s
-  if (v > 150.0f) {
-    v = 150.0f;
-  } else if (v < -150.0f) {
-    v = -150.0f;
+  if (v > 100.0f) {
+    v = 100.0f;
+  } else if (v < -100.0f) {
+    v = -100.0f;
   }
-  float posYerr = 0.0f;
-  if (posY > 0.05f) {
-    posYerr = kPy * sqrtf(posY);
-  } else if (posY < -0.05f) {
-    posYerr = kPy * sqrtf(-posY);
+  float w = kPh * headingErr + kPh_d * yawRate;  // Heading control
+  if (w > 150.0f) {  // Max 1.5m/s diff between wheel speed
+    w = 150.0f;
+  } else if (w < -150.0f) {
+    w = -150.0f;
   }
-  float w = kPh * (heading + posYerr) + kPh_d * yawRate;  // Heading control
   if (going) {
     targVel1 = v;
-    targVel2 = w;  // Right motor goes faster
+    targVel2 = w;
     pushVref(v, true);
     pushVref(w, false);
   } else {
@@ -103,6 +120,7 @@ void loop() {
     heading = 0.0f;
     targVel1 = 0.0f;
     targVel2 = 0.0f;
+    currTarg = 0;
     rotev.motorEnable(true);
   }
 
@@ -228,11 +246,11 @@ void setup1() {
   }
 }
 
-#define VEL_KP 0.03f               // Velocity proportional gain
-#define IREF_MAX_LIN 0.35f         // Max current reference in A
-#define IREF_MAX_DECEL_LIN 0.175f  // Max decel current reference in A
-#define IREF_MAX_ANG 0.05f         // Max current reference in A
-#define IREF_MAX_DECEL_ANG 0.025f
+#define VEL_KP 0.03f              // Velocity proportional gain
+#define IREF_MAX_LIN 0.25f        // Max current reference in A
+#define IREF_MAX_DECEL_LIN 0.15f  // Max decel current reference in A
+#define IREF_MAX_ANG 0.1f         // Max current reference in A
+#define IREF_MAX_DECEL_ANG 0.05f
 
 float vreflin = 0.0f;
 float vrefang = 0.0f;
@@ -292,18 +310,18 @@ void loop1() {
     irefMaxAng = IREF_MAX_DECEL_ANG;
   }
 
-  float availableCurrent = 0.0f;
+  // float availableCurrent = 0.0f;
   if (ireflin > irefMaxLin) {
     ireflin = irefMaxLin;
   } else if (ireflin < -irefMaxLin) {
     ireflin = -irefMaxLin;
   } else {
-    availableCurrent = irefMaxLin - fabsf(ireflin);
+    // availableCurrent = irefMaxLin - fabsf(ireflin);
   }
-  if (irefang > irefMaxAng + availableCurrent) {
-    irefang = irefMaxAng + availableCurrent;
-  } else if (irefang < -irefMaxAng - availableCurrent) {
-    irefang = -irefMaxAng - availableCurrent;
+  if (irefang > irefMaxAng) {
+    irefang = irefMaxAng;
+  } else if (irefang < -irefMaxAng) {
+    irefang = -irefMaxAng;
   }
 
   piUpdate(dt, true, ireflin + irefang, vbus, vel1);
