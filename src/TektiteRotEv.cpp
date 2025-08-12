@@ -1,4 +1,4 @@
-#include "rotev.h"
+#include "TektiteRotEv.h"
 
 #include "Arduino.h"
 
@@ -36,7 +36,7 @@
 
 #define VBUS 28
 
-Rotev::Rotev()
+RotEv::RotEv()
     : mpu(SPI, IMU_CS, Mpu6x00::GYRO_2000DPS, Mpu6x00::ACCEL_16G),
       driver1(DRV1_CS),
       driver2(DRV2_CS),
@@ -76,7 +76,7 @@ int initMotor(DRV8873_SPI& drv, bool one) {
   return 0;
 }
 
-void Rotev::begin() {
+void RotEv::begin() {
   // LEDs
   pinMode(LEDR, OUTPUT);
   pinMode(LEDG, OUTPUT);
@@ -154,22 +154,22 @@ void Rotev::begin() {
   enc2.begin();
 }
 
-float Rotev::readYawDegrees() {
+float RotEv::readYawRateDegrees() {
   this->mpu.readSensor();
   return this->mpu.getGyroZ();
 }
-float Rotev::readYaw() {
+float RotEv::readYawRate() {
   this->mpu.readSensor();
   return this->mpu.getGyroZ() * DEG_TO_RAD;
 }
 
-void Rotev::ledWrite(float r, float g, float b) {
+void RotEv::ledWrite(float r, float g, float b) {
   analogWrite(LEDR, (uint16_t)(r * 65535.0f));
   analogWrite(LEDG, (uint16_t)(g * 65535.0f));
   analogWrite(LEDB, (uint16_t)(b * 65535.0f));
 }
 
-void Rotev::motorEnable(bool enable) {
+void RotEv::motorEnable(bool enable) {
   if (enable) {
     digitalWrite(DRV1_DISABLE, LOW);
     digitalWrite(DRV2_DISABLE, LOW);
@@ -179,46 +179,46 @@ void Rotev::motorEnable(bool enable) {
   }
 }
 
-void Rotev::motorWrite1(float speed) {
+void RotEv::motorWrite1(float speed) {
   digitalWrite(DRV1_PH, speed >= 0.0f ? HIGH : LOW);
   analogWrite(DRV1_EN, (uint16_t)(fabsf(speed) * 65535.0f));
 }
 
-void Rotev::motorWrite2(float speed) {
+void RotEv::motorWrite2(float speed) {
   digitalWrite(DRV2_PH, speed >= 0.0f ? HIGH : LOW);
   analogWrite(DRV2_EN, (uint16_t)(fabsf(speed) * 65535.0f));
 }
 
-float Rotev::getVoltage() {
+float RotEv::getVoltage() {
   // 18kohm R1 5.1kohm R2
   int raw = analogRead(VBUS);
   float voltage = ((float)raw * 3.3f / 4096.0f) * (18.0f + 5.1f) / 5.1f;
   return voltage;
 }
 
-float Rotev::motorCurr1() {
+float RotEv::motorCurr1() {
   int raw = analogRead(DRV1_CURR);
   float voltage = (float)raw * 3.3f / 4096.0f;
   return voltage / 680.0f * 1100.0f;  // 680-ohm resistor, 1100 gain
 }
 
-float Rotev::motorCurr2() {
+float RotEv::motorCurr2() {
   int raw = analogRead(DRV2_CURR);
   float voltage = (float)raw * 3.3f / 4096.0f;
   return voltage / 680.0f * 1100.0f;  // 680-ohm resistor, 1100 gain
 }
 
-bool Rotev::stopButtonPressed() { return digitalRead(STOP) == LOW; }
-bool Rotev::goButtonPressed() { return digitalRead(GO) == LOW; }
+bool RotEv::stopButtonPressed() { return digitalRead(STOP) == LOW; }
+bool RotEv::goButtonPressed() { return digitalRead(GO) == LOW; }
 
-float Rotev::enc1Angle() { return enc1.readAngleRadians(); }
-float Rotev::enc2Angle() { return enc2.readAngleRadians(); }
-float Rotev::enc1AngleDegrees() { return enc1.readAngleDegrees(); }
-float Rotev::enc2AngleDegrees() { return enc2.readAngleDegrees(); }
+float RotEv::enc1Angle() { return enc1.readAngleRadians(); }
+float RotEv::enc2Angle() { return enc2.readAngleRadians(); }
+float RotEv::enc1AngleDegrees() { return enc1.readAngleDegrees(); }
+float RotEv::enc2AngleDegrees() { return enc2.readAngleDegrees(); }
 
-void Rotev::servoDetach() { this->servo.detach(); }
+void RotEv::servoDetach() { this->servo.detach(); }
 // Write angle in degrees
-void Rotev::servoWrite(float angleDeg) {
+void RotEv::servoWrite(float angleDeg) {
   if (!this->servo.attached()) {
     this->servo.attach(SERVO);
   }

@@ -1,5 +1,5 @@
-#ifndef Rotev_h
-#define Rotev_h
+#ifndef RotEv_h
+#define RotEv_h
 
 #include <Servo.h>
 
@@ -8,14 +8,14 @@
 #include "mpu6x00.h"
 #include "mt6701.h"
 
-class Rotev {
+class RotEv {
  public:
-  Rotev();
+  RotEv();
 
   void begin();
   void ledWrite(float r, float g, float b);
-  float readYaw();
-  float readYawDegrees();
+  float readYawRate();
+  float readYawRateDegrees();
   void motorEnable(bool enable);
   void motorWrite1(float speed);
   void motorWrite2(float speed);
