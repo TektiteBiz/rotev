@@ -122,7 +122,7 @@ void RotEv::begin() {
   pinMode(DRV2_PH, OUTPUT);
   pinMode(DRV2_DISABLE, OUTPUT);
 
-  analogWriteFreq(20000);     // 20000 Hz = 20 kHz
+  analogWriteFreq(10000);     // 10000 Hz = 10 kHz
   analogWriteResolution(16);  // 16-bit resolution
 
   this->motorEnable(false);  // Disable motors initially
